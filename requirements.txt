@@ -1,0 +1,8 @@
+streamlit
+ccxt
+pandas
+numpy
+plotly
+yfinance
+pandas_ta
+playsound==1.2.2
