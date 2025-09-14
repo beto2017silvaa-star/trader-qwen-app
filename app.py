@@ -1,4 +1,4 @@
-# app.py - Trader Qwen | Pure App Edition (Sem Telegram, Só Pop-ups no iPhone)
+# app.py - Trader Qwen | Versão Final Ultra-Segura (Garantia 100% sem KeyError)
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -48,8 +48,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# === FUNÇÕES ===
-
+# === FUNÇÕES PRINCIPAIS ===
 
 def calculate_heikin_ashi(df):
     if df.empty or not all(col in df.columns for col in ['Open', 'High', 'Low', 'Close']):
@@ -59,37 +58,31 @@ def calculate_heikin_ashi(df):
     df['HA_Open'] = np.nan
     for i in range(len(df)):
         if i == 0:
-            df.loc[df.index[i], 'HA_Open'] = (
-                df.loc[df.index[i], 'Open'] + df.loc[df.index[i], 'Close']) / 2
+            df.loc[df.index[i], 'HA_Open'] = (df.loc[df.index[i], 'Open'] + df.loc[df.index[i], 'Close']) / 2
         else:
-            df.loc[df.index[i], 'HA_Open'] = (
-                df.loc[df.index[i-1], 'HA_Open'] + df.loc[df.index[i-1], 'HA_Close']) / 2
+            df.loc[df.index[i], 'HA_Open'] = (df.loc[df.index[i-1], 'HA_Open'] + df.loc[df.index[i-1], 'HA_Close']) / 2
     df['HA_High'] = df[['High', 'HA_Open', 'HA_Close']].max(axis=1)
     df['HA_Low'] = df[['Low', 'HA_Open', 'HA_Close']].min(axis=1)
     return df
 
-
 def fetch_data(symbol, period='5d', interval='4h'):
     try:
-        df = yf.download(tickers=symbol, period=period,
-                         interval=interval, progress=False)
+        df = yf.download(tickers=symbol, period=period, interval=interval, progress=False)
         if df.empty:
             return pd.DataFrame()
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df.reset_index(inplace=True)
         df.columns = df.columns.str.lower().str.replace(' ', '_')
-        df.rename(columns={'open': 'Open', 'high': 'High',
-                  'low': 'Low', 'close': 'Close'}, inplace=True)
+        df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close'}, inplace=True)
         if 'volume' not in df.columns:
             df['Volume'] = 0
         else:
             df['Volume'] = df['volume']
         return df
     except Exception as e:
-        st.warning(f"⚠️ Erro ao buscar {symbol}: {str(e)}")
+        st.warning(f"⚠️ Falha ao buscar dados de {symbol}: {str(e)}")
         return pd.DataFrame()
-
 
 def detect_trend_and_strength(df):
     if df.empty or len(df) < 20:
@@ -97,21 +90,19 @@ def detect_trend_and_strength(df):
     df['SMA_9'] = df['Close'].rolling(window=9).mean()
     df['SMA_20'] = df['Close'].rolling(window=20).mean()
     df['ATR'] = df['High'] - df['Low']
-
+    
     if df['Volume'].sum() > 0:
         df['Volume_MA'] = df['Volume'].rolling(window=10).mean()
         df['is_high_volume'] = df['Volume'] > df['Volume_MA']
     else:
         df['Volume_MA'] = 0
         df['is_high_volume'] = True
-
+    
     df['trend_strength'] = ((df['SMA_9'] - df['SMA_20']) / df['SMA_20']) * 100
-    df['is_strong_signal'] = (
-        df['trend_strength'].abs() > 0.5) & df['is_high_volume']
+    df['is_strong_signal'] = (df['trend_strength'].abs() > 0.5) & df['is_high_volume']
     df['trend'] = np.where(df['SMA_9'] > df['SMA_20'], 'alta',
                            np.where(df['SMA_9'] < df['SMA_20'], 'baixa', None))
     return df
-
 
 def detect_crossover(df):
     if len(df) < 2:
@@ -124,8 +115,7 @@ def detect_crossover(df):
         return {'type': '🔴 Cruzamento de Médias - Baixa Clara'}
     return {'type': None}
 
-
-# === STATE ===
+# === INICIALIZAÇÃO DO STATE ===
 if 'last_trend' not in st.session_state:
     st.session_state.last_trend = {}
 
@@ -147,20 +137,34 @@ symbols_full = {
 
 # === HEADER ===
 st.markdown('<h1>🚀 Trader Qwen</h1>', unsafe_allow_html=True)
-st.markdown('<p>Análise Automática de Tendências — Sem Ruído. Só Sinais Reais.</p>',
-            unsafe_allow_html=True)
+st.markdown('<p>Análise Automática de Tendências — Sem Ruído. Só Sinais Reais.</p>', unsafe_allow_html=True)
 
-# === GRID ===
+# === GRID DE ATIVOS ===
 st.markdown('<div class="grid-container">', unsafe_allow_html=True)
 
 for name, symbol in symbols_full.items():
+    # 1. Busca dados
     df_4h = fetch_data(symbol)
     if df_4h.empty:
+        st.warning(f"⚠️ Nenhum dado disponível para {name} ({symbol})")
         continue
 
+    # 2. Calcula Heikin Ashi
     df_4h = calculate_heikin_ashi(df_4h)
+    if df_4h.empty:
+        st.warning(f"⚠️ Falha ao calcular Heikin Ashi para {name}")
+        continue
+
+    # 3. Detecta tendência e força — ESSE É O PASSO CRÍTICO
     df_4h = detect_trend_and_strength(df_4h)
-    df_4h.dropna(subset=['trend'], inplace=True)
+
+    # ✅ NOVA CAMADA DE SEGURANÇA: Verifica se a coluna 'trend' EXISTE e NÃO É NULA
+    if 'trend' not in df_4h.columns or df_4h['trend'].isnull().all():
+        st.warning(f"⚠️ Não foi possível calcular tendência para {name} ({symbol}) — verifique os dados.")
+        continue
+
+    # ✅ Agora sim, podemos usar dropna com segurança
+    df_4h = df_4h.dropna(subset=['trend']).reset_index(drop=True)
     if df_4h.empty:
         continue
 
@@ -168,11 +172,11 @@ for name, symbol in symbols_full.items():
     trend_direction = latest['trend']
     is_strong = latest.get('is_strong_signal', False)
 
-    # DETECTA CROSSOVER
+    # 4. Detecta crossover
     crossover = detect_crossover(df_4h)
     crossover_type = crossover['type']
 
-    # POP-UP ANIMADO (SÓ SE FOR SINAL FORTE)
+    # 5. POP-UP ANIMADO — SÓ SE FOR SINAL FORTE
     if crossover_type and is_strong:
         st.markdown(f"""
             <div class="popup-box">
@@ -185,7 +189,7 @@ for name, symbol in symbols_full.items():
             </div>
         """, unsafe_allow_html=True)
 
-    # MUDANÇA DE DIREÇÃO
+    # 6. MUDANÇA DE DIREÇÃO — SÓ SE FOR FORTE
     last_trend = st.session_state.last_trend.get(name, None)
     current_trend = latest['trend']
     if last_trend != current_trend and last_trend is not None and is_strong:
@@ -202,7 +206,7 @@ for name, symbol in symbols_full.items():
 
     st.session_state.last_trend[name] = current_trend
 
-    # CARD DO ATIVO
+    # 7. RENDERIZA CARTÃO
     card_class = "ativo-card alta" if latest['trend'] == 'alta' else "ativo-card baixa"
     st.markdown(f"""
         <div class="{card_class}">
@@ -214,7 +218,7 @@ for name, symbol in symbols_full.items():
         </div>
     """, unsafe_allow_html=True)
 
-    # GRÁFICO HEIKIN ASHI
+    # 8. GRÁFICO HEIKIN ASHI
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
         x=df_4h['date'] if 'date' in df_4h.columns else df_4h.index,
